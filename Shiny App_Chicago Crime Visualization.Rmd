@@ -1,0 +1,399 @@
+---
+title: "Shiny App for Chicago Crime Vizualization"
+author: "Aabha Desai"
+date: "4/8/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages}
+library(data.table)
+library(shiny)
+library(magrittr)
+# Loading libraries
+if(!require('pacman'))install.packages('pacman')
+pacman::p_load(readr, readxl, ggplot2, plotly, shiny,forcats, lubridate, shinythemes,
+               tidyr, dplyr, plyr, leaflet, htmltools, stringr, magrittr,shinydashboard)
+```
+
+```{r file}
+# loading file
+crimes_data <- fread("Crimes_2020.csv")
+# Checking structure
+str(crimes_data)
+```
+
+```{r tab1}
+# Tab1 : Data Processing - we need month and type of crime
+
+# Converting the Date format to POSIXct
+crimes_data$Date = mdy_hm(crimes_data$Date)
+str(crimes_data)
+
+# Omitting the columns with missing Date
+crimes_data <- crimes_data %>% drop_na(Date)
+
+# Creating new month column
+crimes_data$month <- month(crimes_data$Date)
+
+# Selecting the columns that are going to be used in Tab1
+crimes_tab1 <- crimes_data %>% select(month, `Primary Type`)
+
+# Checking if tab1 has any missing data
+sum(is.na.data.frame(crimes_tab1))
+ 
+#creating new dataframe that gives freq of crime, by month, which we will use to create tab1
+crimes_tab1_freq <- ddply(crimes_tab1, .(crimes_tab1$month, crimes_tab1$`Primary Type`), nrow)
+
+# Renaming column names
+names(crimes_tab1_freq) <- c("Month", "Primary Type", "Freq")
+
+# Converting month no's to proper names
+crimes_tab1_freq$Month <- month.abb[crimes_tab1_freq$Month]
+
+# List of unique crime types. also converting to normal case
+unique_crime_types <- unique(str_to_sentence(unlist(crimes_tab1[,"Primary Type"])))
+```
+
+```{r tab2}
+# Tab2 : Data Processing - we need Date and Location of crime for this tab
+
+# Selecting the columns that are going to be used in Tab2
+crimes_tab2 <- crimes_data %>% select(ID, Date, Latitude, Longitude)
+
+# Omitting the columns with missing latitude or longitude
+crimes_tab2 <- crimes_tab2 %>% drop_na(Latitude, Longitude)
+
+# Checking for NAs
+sum(is.na.data.frame(crimes_tab2))
+```
+
+```{r tab3}
+# Tab3 : Data Processing - we need Type of crime and hour of the day for this tab
+
+# Selecting the columns that are going to be used in Tab3
+crimes_tab3 <- crimes_data %>% select(Date, `Primary Type`)
+
+# Parsing out hour from Date column, & setting as integer
+crimes_tab3$Hour <- as.integer(substr(crimes_tab3$Date, start = 12, stop = 13))
+
+# Creating new dataframe that gives freq of crime, by hour
+crimes_tab3_freq <- ddply(crimes_tab3, .(crimes_tab3$Hour, crimes_tab3$`Primary Type`), nrow)
+
+# Renaming column names
+names(crimes_tab3_freq) <- c("Hour", "Type", "Freq")
+
+# Converting to factor
+crimes_tab3_freq$Type <- as.factor(crimes_tab3_freq$Type)
+
+# Checking for NAs
+sum(is.na.data.frame(crimes_tab3_freq))
+```
+
+```{r tab4}
+# Tab4 : Data Processing - 
+
+# Selecting the columns that are going to be used in Tab4
+crimes_tab4 <- crimes_data %>% select(ID,`Case Number`, `Primary Type`, Description,Arrest, Domestic,District,`Location Description`, `Community Area`,Longitude, Latitude)
+
+# freq in Tab4
+crimes_tab4_freq <- ddply(crimes_tab4, .(crimes_tab4$District,crimes_tab4$`Primary Type`,crimes_tab4$`Community Area`,crimes_tab4$Arrest, crimes_tab4$Domestic, crimes_tab4$Longitude, crimes_tab4$Latitude), nrow)
+
+# Renaming column names
+names(crimes_tab4_freq) <- c("District", "Primary Type", "Community Area", "Arrest", "Domestic","Longitude", "Latitude","Freq")
+
+# Omitting the columns with missing latitude or longitude
+crimes_tab4_freq <- crimes_tab4_freq %>% drop_na()
+
+# Checking for NAs
+sum(is.na.data.frame(crimes_tab4_freq))
+```
+
+```{r ui}
+# Defining ui
+
+#----------------Dashboard Header --------------------------------------------------------
+  
+header <- dashboardHeader(title = "Chicago Crimes 2020",titleWidth = "320")
+  
+#----------------Sidebar content----------------------------------------------------------------
+sidebar <-  ##Sidebar Content
+  dashboardSidebar(width = 320,
+    sidebarMenu(
+      menuItem("Monthly Crime Frequency", tabName = "CrimeFrequency", icon = icon("calendar-alt","fa")),
+      menuItem("Crime Location by Date", tabName = "LocationofCrimesbyDate", icon = icon("search-location","fa")),
+      menuItem("Crime Type by Hour of the Day", tabName = "HeatMap", icon = icon("clock","fa")),
+      menuItem("Community Areas & Crime Frequency", tabName = "Location", icon = icon("map-pin","fa"))
+    ) # end of sidebarMenu
+  ) # end of dashboardSidebar
+  
+#----------------Dashboard Body-------------------------------------------------------------
+body <- dashboardBody(
+  
+  #-----------------CSS for theme--------------------------------------------------------------------------
+ tags$head(tags$style(HTML('
+ 
+/* header title font */
+      .main-header .logo {
+          font-family: "Arial", Times, "Times New Roman", sans-serif, serif;
+          font-weight: bold;
+          font-size: 28px;
+        }
+
+
+/* background color of header (logo part) */
+      .skin-blue .main-header .logo {
+          background-color: DarkSlateBlue;
+      }
+        
+  /* change the background color of header (logo part) when mouse hover */
+.skin-blue .main-header .logo:hover {
+          background-color: DarkSlateBlue;
+        }      
+ 
+/* background color for remaining part of the header #67818a*/
+      .skin-blue .main-header .navbar {
+          background-color: SlateBlue;
+        } 
+                              
+/* main sidebar */
+      .skin-blue .main-sidebar {
+          background-color: SlateBlue;
+        }
+
+/* active sidebar menu item */
+      .skin-blue .main-sidebar .sidebar .sidebar-menu .active a{
+          background-color: white;
+          color:black;
+          font-size: 15px
+        }
+
+/* sidebar menuitems */
+      .skin-blue .main-sidebar .sidebar .sidebar-menu a{
+          background-color: Indigo;
+          color: white;
+          font-size: 15px
+        }
+
+/* sidebar menuitems when mouse hover */
+      .skin-blue .main-sidebar .sidebar .sidebar-menu a:hover{
+          background-color: MediumPurple;
+          color:white;
+          font-size: 15px
+        }
+                              
+/* sidebar toggle button */           
+      .skin-blue .main-header .navbar .sidebar-toggle:hover{
+          background-color: black;
+        }
+    '))),
+  #--------------tabItems------------------------------------------------------------------------
+tabItems(
+    # Tab1 Content:
+    tabItem(tabName = "CrimeFrequency",
+    fluidRow(
+      column(width = 10,
+         box(
+            title= "Crime Frequency by Month & Crime Type",solidHeader = TRUE,collapsible =F,plotlyOutput("bar",height="800",width = "1275"), width = NULL)), #end boxoutput barplot/column
+      
+       column(width = 2,  
+          box(title ="Which month would you like to see crime frequency for?" ,selectInput(inputId = "crime_month",label = strong("Select Month"),choices = crimes_tab1_freq$Month, selected = 3),width = NULL),
+         #end boxinput
+  infoBoxOutput("totalcountBox", width = NULL)) #infoboxtotal count/column end
+  
+) # end of fluidRow tab1
+),# end tab1
+
+#-------------------------------------------------------------------------------------------------------
+
+# Tab2 Content:
+   tabItem(tabName = "LocationofCrimesbyDate",
+fluidRow(
+      box(title= "Location of Crimes by Date",solidHeader = TRUE,
+          collapsible = F,leafletOutput(outputId = "geomap",height="800",width = "1275"),width = 10),#end boxoutput
+      
+      box(title ="Which Date would you like to see Locations of Crimes for?", dateInput(inputId = "date",label = "Select the Date",min = "2020-01-01",max = "2020-09-30", format = "yyyy/mm/dd", value = "2020-03-03"),width = 2, height = 2)#end boxinput
+)# end of fluidRow tab2
+),# end tab2
+
+#-------------------------------------------------------------------------------------------------------------
+
+# Tab3 Content:
+       tabItem(tabName = "HeatMap",
+fluidRow(
+  box(title= "Relationship between Crime Type and Hour of the Day",solidHeader = TRUE,
+              collapsible = F,plotlyOutput(outputId = "heatmap",height="800", width = "1275"),width = 10) #end boxoutput
+)# end of fluidRow tab3
+),# end tab3
+
+#------------------------------------------------------------------------------------------------------------
+
+# Tab4 Content:
+     tabItem(tabName = "Location",
+fluidRow(
+  
+column(width = 10,
+box(title= "Community Area Crime Frequency",solidHeader = TRUE,
+  collapsible = F, leafletOutput(outputId = "geomap2",height="800", width = "1275"), width = NULL)#end of locationmap box
+  ), # endcloumn1
+  
+  
+column(width = 2,
+  box(title ="Which Community Area are you interested in?",
+    # Selecting the district
+      selectInput(inputId = "district", choices = unique(crimes_tab4_freq$District),label = "Select District" , selected = "17", multiple = F),
+  
+    # Selecting the community area no
+      selectInput(inputId = "communityarea", choices = unique(crimes_tab4_freq$`Community Area`),label = "Select Community Area" , selected = "16", multiple = F),
+  
+    # Selecting the Crime type
+      selectInput(inputId = "crimetype", choices = unique(crimes_tab4_freq$`Primary Type`),
+                       label = "Select Crime Type" , selected = "THEFT", multiple = F),width = NULL),#end boxinput
+
+  infoBoxOutput("totalcount2Box", width = NULL),
+  
+  infoBoxOutput("arrestsBox", width = NULL),
+  
+  infoBoxOutput("domesticBox", width = NULL),
+  
+) # end column2
+  
+) # end of fluidRow tab1
+) # end tab4
+#) # end of tabsetpanel
+) # end of dashboard body
+)
+ui <- dashboardPage(header, sidebar, body)
+
+```
+
+
+```{r server}
+
+# Defining server function
+
+server <- function(input, output,session) 
+    {
+# Tab1 : Output
+output$bar <- renderPlotly({ 
+       #selecting crime types for the selected month from frequency data set
+selected_crimes_tab1_freq <- filter(crimes_tab1_freq, Month == input$crime_month)
+
+    #excluding month column at this point, so we only have the columns we need
+selected_crimes_tab1_freq <- selected_crimes_tab1_freq[,2:3]
+
+    #converting crime type list to normal case
+selected_crimes_tab1_freq$`Primary Type` <- str_to_sentence(selected_crimes_tab1_freq$`Primary Type`)
+      
+#defining sequence for y-axis ticks
+yaxis_ticks <- seq(0,6600, 300)
+        
+p1 <- ggplot(selected_crimes_tab1_freq,mapping = aes(x = reorder(`Primary Type`, Freq),y = Freq,group = 1,text = paste0("Crime Type: ", `Primary Type`, "<br>", "Count: ", Freq))) + coord_flip() + geom_bar(stat = "identity", fill= "purple2", width = 0.5) + theme_minimal() + labs(title = paste("Crime Frequency in ", input$crime_month, "\n by Crime Type", sep="")) + theme(plot.title = element_text(hjust = 0.5 ,color = "black", size = 14, face = "italic"), plot.caption = element_text(size = 11 ,face = "italic",color = "white")) + xlab("Crime Type") + ylab("Crime Frequency")  + scale_y_continuous(breaks = yaxis_ticks)
+
+p1 %>% ggplotly(tooltip = "text") %>% plotly_build()
+})
+# infobox total crime count
+output$totalcountBox <- renderInfoBox({
+  selected_crimes_tab1_freq <- filter(crimes_tab1_freq, Month == input$crime_month)
+      infoBox("Reported No. of Crimes", paste0(sum(selected_crimes_tab1_freq$Freq)), icon = icon("hashtag","fa"),
+      color = "purple", fill = TRUE)
+  })
+
+# Tab2 : Output
+output$geomap <- renderLeaflet({
+    #creating new data set based on filtered dates
+crimes_tab2_filtered = crimes_tab2[as.Date(crimes_tab2$Date) == input$date]
+    
+  leaflet(crimes_tab2_filtered) %>% addTiles() %>% setView(lng = -87.7, lat = 41.8, zoom = 10) %>% addMarkers(lng = ~Longitude, lat = ~Latitude)
+  }) #end of Tab 2 output - geomap
+
+# Tab3 : Output
+output$heatmap <- renderPlotly({
+    
+    p3 <- ggplot(crimes_tab3_freq, 
+                 aes(x=Hour, 
+                     y=reorder(Type, Freq), 
+                     fill=Freq,
+                     text = paste0("Crime Type: ", Type, "<br>",
+                                   "Hour: ", Hour, "<br>",
+                                   "Count: ", Freq)
+                 ) #end of aes
+    ) + #end of ggplot
+        geom_tile() + theme(plot.title = element_text(hjust = 0.5 ,color = "black", size = 14, face = "italic"),  text = element_text(size=10), axis.text.x = element_text(angle=45, hjust=1)) + scale_fill_gradientn(colours = colorspace::diverge_hcl(7)) +  xlab("Hour of the Day") + ylab("Crime Type") + labs(title = "Crime Frequency by Hour of the Day",
+             fill = "Freq") + scale_x_continuous(breaks = c(seq(0,23,2))) 
+    
+    
+    p3 %>% ggplotly(tooltip = "text") %>% plotly_build()
+    
+})
+
+  # Tab4 : Output
+  observe({ x <- crimes_tab4_freq$`Community Area`[(crimes_tab4_freq$District == input$district)]
+    updateSelectInput(session, "communityarea", choices = x,selected = tail(x, 1))})
+    
+    observe({ y <- crimes_tab4_freq$`Primary Type`[(crimes_tab4_freq$`Community Area` == input$communityarea)]
+    updateSelectInput(session, "crimetype", choices = y,selected = tail(y, 1))})
+    
+    output$geomap2 <- renderLeaflet({
+    crimes_tab4_freq <- crimes_tab4_freq %>%filter((District == input$district)&(`Community Area` == input$communityarea)& (`Primary Type` == input$crimetype))
+            
+  leaflet(crimes_tab4_freq) %>% addTiles()%>%  setView(lng = -87.7, lat = 41.8, zoom = 10)%>% addMarkers(lng=crimes_tab4_freq$Longitude,lat=crimes_tab4_freq$Latitude,label = paste("Arrest Made?:", crimes_tab4_freq$Arrest, "Domestic Crime?:",crimes_tab4_freq$Domestic, "No. of incidents:",crimes_tab4_freq$Freq))
+  })
+    
+   
+# total count infobox
+output$totalcount2Box <- renderInfoBox({
+  crimes_tab4_freq <- crimes_tab4_freq %>%filter((District == input$district)&(`Community Area` == input$communityarea)& (`Primary Type` == input$crimetype))
+  
+infoBox("Reported No of Crimes", paste0(sum(crimes_tab4_freq$Freq)), icon = icon("balance-scale-left","fa"),
+      color = "purple", fill = TRUE)
+  })
+
+ # total Arrests infobox
+output$arrestsBox <- renderInfoBox({
+  crimes_tab4_freq <- crimes_tab4_freq %>%filter((District == input$district)&(`Community Area` == input$communityarea)& (`Primary Type` == input$crimetype))
+  
+      infoBox("Arrests Made", paste0(sum(crimes_tab4_freq$Arrest=="TRUE")), icon = icon("bullhorn","fa"),
+      color = "red", fill = TRUE)
+  })
+
+
+# total domestic infobox
+output$domesticBox <- renderInfoBox({
+  crimes_tab4_freq <- crimes_tab4_freq %>%filter((District == input$district)&(`Community Area` == input$communityarea)& (`Primary Type` == input$crimetype))
+      infoBox("Domestic Incidences", paste0(sum(crimes_tab4_freq$Domestic=="TRUE")), icon = icon("home","fa"), color = "yellow", fill = TRUE)
+  })
+
+         
+} 
+```
+
+```{r shiny}
+# Run the application 
+shinyApp(ui = ui, server = server)
+```
+           
+           
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
