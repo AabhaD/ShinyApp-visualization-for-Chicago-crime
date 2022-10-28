@@ -3,6 +3,7 @@
 
 ### Data and Packages/skills used -
 **Data** : The data set contains the reported incidents of crime in the City of Chicago. Variable descriptions and other details about the data set can be found in the following site: https://data.cityofchicago.org/Public-Safety/Crimes-2001-to-present/ijzp-q8t2. The attached data file contains information from 2020 only.
+
 **Programming Language** : R Shinny
 
 ### Tab 1: Frequency of crime by month and crime type. Create bar charts for different month crime type combinations.
@@ -18,6 +19,7 @@
 ![](https://github.com/AabhaD/ShinyApp/blob/main/images/Tab3-A%20heatmap%20using%20the%20type%20of%20the%20crime%20and%20the%20hour%20of%20the%20day%20when%20the%20crime%20was%20comitted.png)
 
 ### Tab 4: Community Area Crime Frequency.
+
 ![](https://github.com/AabhaD/ShinyApp/blob/main/images/Tab4-Create%20a%20tab%20with%20any%20other%20information%20(e.g.%2C%20a%20predictive%20model%20of.png)
 
 ### Reference :
