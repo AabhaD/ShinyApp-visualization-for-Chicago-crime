@@ -1,10 +1,10 @@
-## 2020 Chicago crime visualization using interactive dashboard on R-Shinny App.
+## 2020 Chicago crime visualization using interactive dashboard on R-Shiny App.
  
 
 ### Data and Packages/skills used -
 **Data** : The data set contains the reported incidents of crime in the City of Chicago. Variable descriptions and other details about the data set can be found in the following site: https://data.cityofchicago.org/Public-Safety/Crimes-2001-to-present/ijzp-q8t2. The attached data file contains information from 2020 only.
 
-**Programming Language** : R Shinny
+**Programming Language** : R Shiny
 
 ### Tab 1: Frequency of crime by month and crime type. Create bar charts for different month crime type combinations.
 
