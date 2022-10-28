@@ -20,7 +20,7 @@
 
 ### Tab 4: Community Area Crime Frequency.
 
-![](https://github.com/AabhaD/ShinyApp/blob/main/images/Tab4-Create%20a%20tab%20with%20any%20other%20information%20(e.g.%2C%20a%20predictive%20model%20of.png)
+(![Tab4-Create a tab with any other information (e g , a predictive model of](https://user-images.githubusercontent.com/77465643/198721107-2cf39a7a-e3ba-4d63-9693-dab8d9939278.png)
 
 ### Reference :
 https://www.r-bloggers.com/2020/04/hands-on-how-to-build-an-interactive-map-in-r-shiny-an-example-for-the-covid-19-dashboard/
