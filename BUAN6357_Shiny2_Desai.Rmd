@@ -1,6 +1,6 @@
 ---
 title: "Shiny2"
-author: "Aabha Desai(AXD20015)"
+author: "Aabha Desai"
 date: "4/8/2021"
 output:
   pdf_document: default
